@@ -1,0 +1,75 @@
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // --- OTA Version Check Logic ---
+  var deviceVersion = e.parameter.version || "unknown";
+
+  // 1. Log to the first sheet
+  var logSheet = ss.getSheets()[0];
+  var now = new Date();
+  var battery = e.parameter.battery || "N/A";
+  var voltage = e.parameter.voltage || "";
+  var state = e.parameter.state || "N/A";
+  
+  var battString = (battery !== "N/A") ? battery + "%" + (voltage ? " (" + voltage + "mV)" : "") : "N/A";
+  logSheet.appendRow([now, battString, state, "v" + deviceVersion]);
+  
+  // 2. Check Calendar
+  var calendars = CalendarApp.getCalendarsByName("Mom's Reminders");
+  var nextTime = "NONE";
+  var nextTitle = "NONE";
+  if (calendars.length > 0) {
+    var events = calendars[0].getEventsForDay(now);
+    for (var i = 0; i < events.length; i++) {
+      var eventStart = events[i].getStartTime();
+      if (eventStart >= new Date(now.getTime() - 5*60000)) {
+         nextTime = Utilities.formatDate(eventStart, "America/Los_Angeles", "HH:mm");
+         nextTitle = events[i].getTitle();
+         break;
+      }
+    }
+  }
+
+  // 3. Read Settings Tab
+  var settingsSheet = ss.getSheetByName("Settings");
+  var params = {};
+  if (settingsSheet) {
+    var data = settingsSheet.getDataRange().getValues();
+    for (var i = 0; i < data.length; i++) {
+       var key = data[i][0];
+       var val = data[i][1];
+       
+       // Only add to JSON if BOTH columns have data, and ignore your header row!
+       // (Assuming your column A header is named "PARAMETRO" or similar)
+       if (key && val !== "" && key !== "PARAMETRO") {
+         params[key] = val;
+       }
+    }
+  }
+  
+  // --- Inject OTA URL if update is needed ---
+  // Extract the target version and URL from the settings we just read from the sheet
+  var targetVersion = params["OTA_TARGET_VERSION"] || "0.0.0";
+  var firmwareUrl = params["OTA_FIRMWARE_URL"] || "";
+  
+  delete params["OTA_TARGET_VERSION"]; // Remove so it doesn't get sent to ESP32 memory
+  delete params["OTA_FIRMWARE_URL"];   // Remove so it doesn't get sent to ESP32 memory
+  
+  if (deviceVersion !== targetVersion && firmwareUrl !== "") {
+    params.ota_url = firmwareUrl; // Only inject the download link if versions mismatch!
+  }
+  
+  // 4. Return as JSON
+  var response = {
+    status: "SUCCESS",
+    reminder_time: nextTime,
+    reminder_text: nextTitle,
+    params: params
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
+}
+function forceAuth() {
+  // This function does nothing except force Google to ask for Calendar permissions!
+  CalendarApp.getCalendarsByName("Mom's Reminders");
+}

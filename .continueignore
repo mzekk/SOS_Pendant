@@ -1,0 +1,33 @@
+# === PlatformIO & ESP-IDF Build Artifacts ===
+.pio/
+build/
+.pioenvs/
+.piopm/
+*.dependencies/
+
+# === Compiled Hardware Binaries ===
+*.bin
+*.elf
+*.hex
+*.map
+*.o
+*.d
+*.a
+
+# === Python Virtual Environments & Caches ===
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# === IDE and OS System Caches ===
+.vscode/
+.git/
+.DS_Store
+Thumbs.db
+.continue/
